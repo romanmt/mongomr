@@ -1,0 +1,12 @@
+{   "name"         : "mapreduce"
+  , "version"      : "0.1.0"
+  , "description"  : "Testing out mapreduce functionality"
+  , "author"       : "romanmt"
+  , "dependencies" : 
+    {   "Faker"    : "0.1.3"
+      , "mongolian"  : "0.1.8"
+      , "underscore" : "1.1.5"
+      , "eyes"       : "0.1.6"
+    }
+  , "engines" : {"node" : "0.4.x" }
+}
