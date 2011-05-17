@@ -5,13 +5,36 @@ var mongolian  = require('mongolian')
   , db         = global.db = mongo.db("mapreduce-development")
   , Faker      = require('Faker');
 
-var songs = db.collection("products");
-songs.drop(function(){
+var products = db.collection("products");
+
+var map = function() {
+  emit(this.group, 1);
+};
+
+var reduce = function(k, value) {
+  var sum = 0;
+  for(var i in vals) {
+    sum += vals[i];
+  }
+  return sum;
+};
+
+products.drop(function(){
 
   for(i=0; i < 1000; i++) {
-    songs.save({product: Faker.Company.bs(), company: Faker.Company.companyName(), random: Math.random()});
-  }
-
+    products.save(
+      { product: Faker.Company.bs()
+      , company: Faker.Company.companyName()
+      , random: Math.random()
+      , group: i % 10
+      });   
+  };
+  
+  products.mapReduce(map, reduce, {query : { group : 2, rand : {$lte: Math.random()}}},
+    function(err, res) {
+      inspect(res);
+    }
+  );
 });
 
 
