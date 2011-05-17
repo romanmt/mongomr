@@ -11,7 +11,7 @@ var map = function() {
   emit(this.group, 1);
 };
 
-var reduce = function(k, value) {
+var reduce = function(k, vals) {
   var sum = 0;
   for(var i in vals) {
     sum += vals[i];
@@ -30,9 +30,10 @@ products.drop(function(){
       });   
   };
   
-  products.mapReduce(map, reduce, {query : { group : 2, rand : {$lte: Math.random()}}},
+  products.mapReduce(map, reduce, {query : { group : 2, random : {$lte: Math.random()}}},
     function(err, res) {
-      inspect(res);
+      if(err) throw err;
+      inspect(res.find());
     }
   );
 });
