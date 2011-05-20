@@ -8,6 +8,7 @@ var mongolian  = require('mongolian')
 
 var products = db.collection("products");
 var randomized = db.collection("randomized");
+var plist = db.collection("plist");
 
 var mapInjectRandom = function() {
   emit(this._id, 
@@ -41,7 +42,7 @@ var createProducts =  function (callback) {
                        , company: Faker.Company.companyName()
         });
     }
-    callback(null)
+    callback(null);
 };
 
 var injectRandomAttribute = function (callback) {  
@@ -51,30 +52,47 @@ var injectRandomAttribute = function (callback) {
 
 var selectProductIds = function (res, callback) {
     console.log("select prod list");
+    var sample = Math.random();
     randomized.mapReduce(mapPlist, reduce,
-          { out   : {inline : 1}
-          , query : {'value.random' : {$gte : Math.random()}}
+          { out   : 'plist'
+          , query : {'value.random' : {$gte : sample}}
           , limit : 6},
-          callback);
+          function (err, res) { callback(err, res, sample) });
+};
+
+var selectBackwards = function (res, sample, callback) {
+    var count = res.counts.output;
+    if (count < 6) {
+        console.log("not enough results ("+count+" of 6), getting more...");
+        randomized.mapReduce(mapPlist, reduce,
+            { out   : {merge : 'plist'}
+            , query : {'value.random' : {$lte : sample}}
+            , limit : 6 - count},
+            callback);
+    } else {
+      callback(null, res);
+    } 
 };
 
 var selectProducts = function (res, callback) {
     console.log("select products");
-    var ids = _.map(res.results, function(x) {return x.value._id} );
-    products.find({_id : {$in :ids}}).toArray(callback);
+    plist.find().toArray(function (err, values) {
+        var ids = _.map(values, function(x) {return x.value._id} );
+        inspect(ids);
+        products.find({_id : {$in : ids}}).toArray(callback);
+    });
 };
 
 var printResults = function (err, prods) {
     if (err) throw err;
     console.log("print products");
-    inspect(prods);
+    inspect(_.map(prods, function (x) {return x.product}));
 };
 
 async.waterfall(
-    [ dropProducts
-    , createProducts
-    , injectRandomAttribute
+    [ injectRandomAttribute
     , selectProductIds
+    , selectBackwards
     , selectProducts
     ]
     , printResults);
