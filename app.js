@@ -3,47 +3,79 @@ var mongolian  = require('mongolian')
   , underscore = global._ = require('underscore')
   , inspect    = global.inspect = require('eyes').inspector()
   , db         = global.db = mongo.db("mapreduce-development")
+  , async      = require('async')
   , Faker      = require('Faker');
 
 var products = db.collection("products");
-var mrresult = db.collection("mrresult");
+var randomized = db.collection("randomized");
 
-var map = function() {
-  emit(this._id, 1);
+var mapInjectRandom = function() {
+  emit(this._id, 
+      { _id    : this._id
+      , random : Math.random()
+      });
 };
+
+var mapPlist = function() {
+  emit(this._id, 
+      { _id    : this.value._id
+      , random : this.value.random 
+      });
+}
 
 var reduce = function(k, vals) {
-  return 1;
+  return vals;
 };
 
-products.drop(function(){
+var dropProducts = function (callback) {
+    console.log("drop products");
+    products.drop( function (){
+        callback(null);
+    });
+};
 
-  for(i=0; i < 10000; i++) {
-    products.save(
-      { product: Faker.Company.bs()
-      , company: Faker.Company.companyName()
-      , random: Math.random()
-      , group: i % 10
-      });   
-  };
+var createProducts =  function (callback) {
+    console.log("create products");
+    for (i = 0; i < 20; i++) {
+        products.save( { product: Faker.Company.bs()
+                       , company: Faker.Company.companyName()
+        });
+    }
+    callback(null)
+};
 
-  var sample = Math.random();
+var injectRandomAttribute = function (callback) {  
+    console.log("inject random");
+    products.mapReduce(mapInjectRandom, reduce, {out: 'randomized'}, callback);
+};
 
-  var plist = function(direction, operation, group, limit) {
-    var options = {limit: limit, query: {random: {}} , out: { } };
-    options.query.random[direction] = sample;
-    options.query.group = group;
-    options.out[operation] = "mrreduce";
-    products.mapReduce(map, reduce, options,
-      function(err, res) {
-        if(err) throw err;
-        if(res.counts.output < limit) {
-          console.log("Not enough data! need %d, got %d", limit, res.counts.output);
-          plist("$gt", "merge", limit - res.counts.output);
-        }
-      });
-    };
-    plist("$lte", "replace", 2, 100);
-});
+var selectProductIds = function (res, callback) {
+    console.log("select prod list");
+    randomized.mapReduce(mapPlist, reduce,
+          { out   : {inline : 1}
+          , query : {'value.random' : {$gte : Math.random()}}
+          , limit : 6},
+          callback);
+};
 
+var selectProducts = function (res, callback) {
+    console.log("select products");
+    var ids = _.map(res.results, function(x) {return x.value._id} );
+    products.find({_id : {$in :ids}}).toArray(callback);
+};
+
+var printResults = function (err, prods) {
+    if (err) throw err;
+    console.log("print products");
+    inspect(prods);
+};
+
+async.waterfall(
+    [ dropProducts
+    , createProducts
+    , injectRandomAttribute
+    , selectProductIds
+    , selectProducts
+    ]
+    , printResults);
 
