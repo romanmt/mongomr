@@ -66,7 +66,7 @@ var selectBackwards = function (res, sample, callback) {
         console.log("not enough results ("+count+" of 6), getting more...");
         randomized.mapReduce(mapPlist, reduce,
             { out   : {merge : 'plist'}
-            , query : {'value.random' : {$lte : sample}}
+            , query : {'value.random' : {$lt : sample}}
             , limit : 6 - count},
             callback);
     } else {
